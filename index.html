@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>課題リマインダー</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+html{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+</style>
+<style>
+/* Layout: a study desk. Blackboard header with today's counts, sticky index tabs,
+   then one sheet of ruled campus-note paper holding the task list. Single look by choice. */
+:root{
+  --desk:#E5E0D8; --ink:#333333; --ink-strong:#2C2C2C; --faint:#7B8088;
+  --board:#264636; --board-deep:#1E382B; --board-ink:#F4F6F4; --board-muted:#D0DDD6; --wood:#8D6E63;
+  --paper:#FAF8F5; --paper-edge:#D5CFC7; --rule:#DCE3E8; --rule-head:#B8C4CC; --margin:#E6A1A1;
+  --chip:#EFECE6; --chip-edge:#DFD9CE; --tab-off:#EBE6DF; --seg:#DED8CE;
+  --pink:#FF85A1; --yellow:#FFE156; --blue:#70D6FF; --urgent:#B82547; --danger:#C62828;
+  --pl:56px;
+  --font-jp:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;
+  --font-mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--desk);color:var(--ink);font-family:var(--font-jp);font-size:15px;line-height:1.6}
+h1,p,ul{margin:0}
+ul{padding:0;list-style:none}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--board);outline-offset:2px}
+.wrap{max-width:672px;margin-inline:auto;padding-block:24px 104px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+svg{flex:none;display:block}
+
+/* blackboard */
+.board{position:relative;overflow:hidden;background:var(--board);color:var(--board-ink);border-radius:8px 8px 0 0;
+  padding:20px;border-bottom:10px solid var(--wood);box-shadow:0 4px 6px -1px rgba(0,0,0,.12)}
+.dust{position:absolute;inset:0;opacity:.05;pointer-events:none;background-image:radial-gradient(#fff 1px,transparent 1px);background-size:16px 16px}
+.board-row{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.14em;color:#A3B8AD;margin-bottom:4px}
+h1{font-size:19px;font-weight:700;letter-spacing:.06em;line-height:1.4}
+.stats{display:flex;flex-wrap:wrap;gap:12px}
+.stat{border:1px solid rgba(244,246,244,.4);border-radius:4px;padding:6px 12px;background:rgba(30,56,43,.6);display:flex;align-items:baseline;gap:8px}
+.stat span{font-size:12px;color:var(--board-muted)}
+.stat b{font-family:var(--font-mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#fff}
+.stat b.hot{color:var(--pink)}
+.stat b.left{color:var(--yellow)}
+.chalks{position:absolute;bottom:0;right:24px;display:flex;align-items:flex-end;gap:8px}
+.chalks i{display:block;border-radius:2px 2px 0 0}
+.chalk-w{width:24px;height:6px;background:rgba(255,255,255,.8)}
+.chalk-p{width:20px;height:6px;background:rgba(255,133,161,.9)}
+.duster{width:40px;height:12px;background:#D7CCC8;border-bottom:4px solid #4E342E}
+
+/* index tabs + tool filter */
+.bar{margin-top:20px;padding-inline:8px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px}
+.tabs{display:flex;align-items:flex-end;gap:6px;min-width:0}
+.tab{border:0;border-top:4px solid var(--yellow);border-radius:6px 6px 0 0;background:var(--tab-off);color:#6B7280;
+  padding:8px 16px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.tab:hover{background:#F3EFEA}
+.tab[aria-pressed="true"]{background:var(--paper);color:var(--ink);padding-top:12px;margin-bottom:-1px;position:relative;z-index:2}
+.tab.t-b{border-top-color:var(--blue)} .tab.t-p{border-top-color:var(--pink)}
+.cnt{font-family:var(--font-mono);font-size:12px;line-height:1;padding:3px 6px;border-radius:999px;color:#1F2937;background:rgba(255,225,86,.6);font-variant-numeric:tabular-nums}
+.t-b .cnt{background:rgba(112,214,255,.4)} .t-p .cnt{background:rgba(255,133,161,.4)}
+.seg{display:flex;align-items:center;background:var(--seg);padding:4px;border-radius:6px;margin-bottom:6px;font-size:12px}
+.seg button{border:0;background:transparent;color:#4B5563;padding:4px 10px;border-radius:4px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.seg button:hover{color:#111827}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.seg .lbl{display:none}
+
+.note{margin:10px 8px 0;font-size:13px;color:#5F5A52}
+
+/* note paper */
+.paper{position:relative;overflow:hidden;background:var(--paper);border:1px solid var(--paper-edge);border-radius:0 8px 8px 8px;
+  box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);min-height:460px;display:flex;flex-direction:column;justify-content:space-between}
+.mline{position:absolute;top:0;bottom:0;left:44px;width:1px;background:var(--margin);pointer-events:none;z-index:1}
+.mline.two{left:46px;opacity:.4}
+.holes{position:absolute;top:32px;bottom:32px;left:12px;display:flex;flex-direction:column;justify-content:space-around;opacity:.6;pointer-events:none}
+.holes i{display:block;width:14px;height:14px;border-radius:50%;background:var(--desk);border:1px solid #D0C9C0;box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
+.paper-head{min-height:48px;border-bottom:2px solid var(--rule-head);display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:0 12px;
+  padding:8px 16px 6px var(--pl);font-family:var(--font-mono);font-size:12px;color:var(--faint)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:52px;padding:10px 12px 10px var(--pl);border-bottom:1px solid var(--rule)}
+.row:hover{background:rgba(242,239,233,.7)}
+.row.is-done{background:rgba(245,243,239,.5)}
+.row-main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:0 8px 0 0;border:0;background:none;text-align:left}
+.row-main:disabled{cursor:default}
+.tool{padding:6px;border-radius:4px;background:var(--chip);border:1px solid #E0DBD1;flex:none}
+.is-done .tool{opacity:.4}
+.ttl-wrap{min-width:0}
+.ttl{font-size:15px;font-weight:500;line-height:1.45;padding:0 2px;color:var(--ink-strong);overflow-wrap:anywhere;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone}
+.is-done .ttl{color:#8C9199;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#9CA3AF}
+.badge{display:inline-block;font-size:11px;font-weight:700;line-height:1.5;border:1px solid var(--faint);color:var(--faint);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.row-side{display:flex;align-items:center;gap:8px;flex:none}
+.due{font-family:var(--font-mono);font-size:12px;padding:2px 8px;border-radius:4px;border:1px solid var(--chip-edge);background:var(--chip);color:#4B5563;white-space:nowrap;font-variant-numeric:tabular-nums}
+.due.urgent{background:rgba(255,133,161,.2);border-color:var(--pink);color:var(--urgent);font-weight:500}
+.is-done .due{border-color:transparent;background:none;color:#8C9199}
+.erase{display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:500;border:1px solid #D1D5DB;background:#fff;color:#374151}
+.erase:hover{background:#FAF0CA;border-color:#FBBF24}
+.erase:active{transform:scale(.95)}
+.is-done .erase{background:#E5E7EB;color:#4B5563}
+.erase .lbl{display:none}
+.trash{padding:6px;border:0;background:none;border-radius:4px;color:#8C9199}
+.trash:hover{color:var(--danger)}
+.trash.confirm{background:var(--danger);color:#fff;font-size:12px;font-weight:700;padding:6px 8px;white-space:nowrap}
+.erase:disabled,.trash:disabled{opacity:.4;cursor:default}
+.blank{height:52px;border-bottom:1px solid var(--rule)}
+.empty{padding:80px 24px 80px var(--pl);text-align:center;color:var(--faint)}
+.empty p:first-child{font-size:14px}
+.empty p + p{font-size:12px;margin-top:4px}
+.paper-foot{min-height:40px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px 12px;
+  padding:6px 20px 6px var(--pl);font-family:var(--font-mono);font-size:11px;color:var(--faint);background:var(--paper)}
+.legend{display:flex;align-items:center;gap:12px}
+.legend span{display:flex;align-items:center;gap:4px}
+
+.example-bar{margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;
+  background:#FFF3B0;border-radius:2px;padding:10px 14px;font-size:13px;color:#4A4332;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.linkbtn{border:0;background:none;padding:2px 0;font-weight:700;color:var(--board);text-decoration:underline;text-underline-offset:3px}
+
+/* pen button + memo modal */
+.fab{position:fixed;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:20;
+  background:var(--board);color:#fff;border:2px solid var(--wood);border-radius:999px;padding:14px 20px;
+  display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;letter-spacing:.04em;box-shadow:0 20px 25px -5px rgba(0,0,0,.22)}
+.fab:hover{background:var(--board-deep)}
+.fab svg,.sheet-head .who svg,.btn-write svg{color:var(--yellow)}
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet{width:100%;max-width:448px;max-height:100%;overflow-y:auto;background:var(--paper);border:2px solid var(--wood);border-radius:8px;box-shadow:0 25px 50px -12px rgba(0,0,0,.35)}
+.sheet-head{background:var(--board);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:4px solid var(--wood)}
+.sheet-head .who{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}
+.sheet-head button{border:0;background:none;color:#D1D5DB;padding:4px;border-radius:4px}
+.sheet-head button:hover{color:#fff}
+.sheet form{padding:20px;display:flex;flex-direction:column;gap:20px}
+.fld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fld > label,.fld > .lab{font-size:12px;font-weight:700;color:#4B5563;display:flex;align-items:center;gap:4px}
+.fld input{width:100%;min-width:0;background:#fff;border:1px solid #D1D5DB;border-radius:4px;padding:10px 14px;font-size:16px}
+.fld input[type="date"]{font-family:var(--font-mono)}
+.fld input:focus{outline:none;border-color:var(--board);box-shadow:0 0 0 1px var(--board)}
+.picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 4px;border-radius:4px;border:1px solid #D1D5DB;background:#fff;color:#374151;font-size:12px;font-weight:500;text-align:center;line-height:1.3}
+.pick:hover{background:#F9FAFB}
+.pick[aria-pressed="true"]{background:var(--board);border-color:var(--board);color:#fff}
+.two{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.hls{display:flex;align-items:center;gap:8px;padding-top:4px}
+.hl{width:32px;height:32px;border-radius:50%;border:2px solid transparent;opacity:.7;display:grid;place-items:center;padding:0;color:#111827}
+.hl:hover{opacity:1}
+.hl[aria-pressed="true"]{border-color:#111827;opacity:1;transform:scale(1.1)}
+.hl svg{visibility:hidden}
+.hl[aria-pressed="true"] svg{visibility:visible}
+.preview{background:var(--chip);border:1px solid var(--chip-edge);border-radius:4px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}
+.preview .cap{font-size:11px;color:#6B7280;white-space:nowrap}
+.preview .pv{font-weight:500;color:#1F2937;padding:0 4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.form-msg{font-size:13px;color:var(--urgent)}
+.form-msg:empty{display:none}
+.sheet-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px solid #E5E7EB}
+.btn-cancel{border:0;background:none;border-radius:4px;padding:8px 16px;font-size:12px;font-weight:700;color:#4B5563}
+.btn-cancel:hover{background:#E5E7EB}
+.btn-write{border:0;background:var(--board);color:#fff;border-radius:4px;padding:8px 20px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.btn-write:hover{background:var(--board-deep)}
+
+.toast{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(28px + env(safe-area-inset-bottom,0px));z-index:60;
+  max-width:min(70vw,360px);background:#2C2C2C;color:#FAF8F5;border-radius:6px;padding:10px 14px;font-size:13px}
+
+@media (min-width:640px){
+  :root{--pl:72px}
+  h1{font-size:20px}
+  .mline{left:56px} .mline.two{left:58px}
+  .seg .lbl,.erase .lbl{display:inline}
+  .row{padding-right:20px}
+  .row-side{gap:12px}
+  .ttl{font-size:16px}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:440px){
+  .tab{padding-inline:10px}
+  .row-side{gap:4px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .tab,.seg button,.erase,.trash,.pick,.hl,.fab{transition:background-color .12s,color .12s,transform .12s,opacity .12s}
+  .fab:hover{transform:scale(1.04)}
+  .fab:active{transform:scale(.96)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="board">
+    <div class="dust"></div>
+    <div class="board-row">
+      <div>
+        <p class="eyebrow">STUDY DESK REMINDER</p>
+        <h1 id="today-label">&nbsp;</h1>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>今日締切</span><b id="n-today">–</b><span>件</span></div>
+        <div class="stat"><span>残りの課題</span><b class="left" id="n-left">–</b><span>件</span></div>
+      </div>
+    </div>
+    <div class="chalks" aria-hidden="true"><i class="chalk-w"></i><i class="chalk-p"></i><i class="duster"></i></div>
+  </header>
+
+  <div class="bar">
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab t-y" data-tab="uncompleted" aria-pressed="true"><span>未完了</span><span class="cnt" id="c-un">0</span></button>
+      <button type="button" class="tab t-b" data-tab="all" aria-pressed="false"><span>すべて</span><span class="cnt" id="c-all">0</span></button>
+      <button type="button" class="tab t-p" data-tab="completed" aria-pressed="false"><span>完了済み</span><span class="cnt" id="c-done">0</span></button>
+    </div>
+    <div class="seg" id="types">
+      <button type="button" data-type="all" aria-pressed="true">全種類</button>
+      <button type="button" data-type="pc" aria-pressed="false" title="PC・レポート"><span data-icon="pc" data-size="14"></span><span class="lbl">PC</span></button>
+      <button type="button" data-type="notebook" aria-pressed="false" title="ノート・手書き"><span data-icon="notebook" data-size="14"></span><span class="lbl">ノート</span></button>
+      <button type="button" data-type="book" aria-pressed="false" title="参考書・テスト"><span data-icon="book" data-size="14"></span><span class="lbl">参考書</span></button>
+    </div>
+  </div>
+
+  <main class="paper">
+    <div class="mline"></div><div class="mline two"></div>
+    <div class="holes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div>
+      <div class="paper-head"><span>No. 01 — TASK LIST</span><span>消しゴムアイコンで完了</span></div>
+      <div id="list-wrap"><div class="empty"><p>課題を読み込み中…</p></div></div>
+    </div>
+    <div class="paper-foot">
+      <div class="legend">
+        <span><span data-icon="pc" data-size="12"></span>PC</span>
+        <span><span data-icon="notebook" data-size="12"></span>ノート</span>
+        <span><span data-icon="book" data-size="12"></span>参考書</span>
+      </div>
+      <span>CAMPUS NOTE UI</span>
+    </div>
+  </main>
+
+  <p class="note" id="note" hidden></p>
+
+  <div class="example-bar" id="example-bar" hidden>
+    <span>「例」の課題が入っています。使い方を確認したら消してください。</span>
+    <button class="linkbtn" type="button" id="clear-examples">例をぜんぶ消す</button>
+  </div>
+</div>
+
+<button class="fab" type="button" id="fab" hidden><span data-icon="pen" data-size="20"></span><span>課題を書き込む</span></button>
+
+<div class="overlay" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="sheet-head">
+      <div class="who"><span data-icon="pen" data-size="16"></span><span id="modal-title">ノートに新しい課題を書き込む</span></div>
+      <button type="button" id="m-close" aria-label="閉じる"><span data-icon="x" data-size="20"></span></button>
+    </div>
+    <form id="task-form" novalidate>
+      <div class="fld">
+        <label for="m-title">課題の内容</label>
+        <input id="m-title" type="text" maxlength="120" autocomplete="off" placeholder="例：統計学のレポート提出、第3章の暗記など">
+      </div>
+      <div class="fld">
+        <span class="lab">課題のタイプ（使う道具）</span>
+        <div class="picks" id="m-types"></div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label for="m-date"><span data-icon="calendar" data-size="14"></span><span>締切日</span></label>
+          <input id="m-date" type="date">
+        </div>
+        <div class="fld">
+          <span class="lab">蛍光ペン（優先度ライン）</span>
+          <div class="hls" id="m-hls"></div>
+        </div>
+      </div>
+      <div class="preview">
+        <span class="cap">ノート表示プレビュー:</span>
+        <span class="pv" id="m-preview">課題のタイトル</span>
+      </div>
+      <p class="form-msg" id="m-msg" role="alert"></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn-cancel" id="m-cancel">キャンセル</button>
+        <button type="submit" class="btn-write"><span data-icon="pen" data-size="14"></span><span>ノートに書く</span></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+  var WD = ['日','月','火','水','木','金','土'];
+  var LS_KEY = 'kadai-reminder-tasks';
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var $ = function(id){ return document.getElementById(id); };
+
+  var ICONS = {
+    pc:'<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>',
+    book:'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    notebook:'<path d="M4 13.5V4a2 2 0 0 1 2-2h8.5L20 7.5V20a2 2 0 0 1-2 2h-5.5"/><path d="M14 2v6h6"/><path d="M10.42 12.61a2.1 2.1 0 1 1 2.97 2.97L7.95 21 4 22l.99-3.95 5.43-5.44Z"/>',
+    eraser:'<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+    pen:'<path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+    calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+    trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    check:'<path d="M20 6 9 17l-5-5"/>'
+  };
+  var TYPES = {
+    pc:{ label:'PC・レポート', color:'#334155' },
+    notebook:{ label:'ノート・手書き', color:'#065F46' },
+    book:{ label:'参考書・テスト', color:'#78350F' }
+  };
+  var HLS = {
+    none:{ label:'なし', dot:'#E5E7EB' },
+    pink:{ label:'重要（ピンク）', dot:'#FF85A1', line:'rgba(255,133,161,.55)' },
+    yellow:{ label:'注意（イエロー）', dot:'#FFE156', line:'rgba(255,225,86,.65)' },
+    blue:{ label:'マーク（ブルー）', dot:'#70D6FF', line:'rgba(112,214,255,.55)' }
+  };
+
+  var tasks = [];
+  var loaded = false, mode = 'loading', col = null;
+  var readOnly = false, slow = false, failed = false;
+  var activeTab = 'uncompleted', typeFilter = 'all';
+  var newType = 'pc', newHl = 'none';
+  var confirmId = null;
+  var queues = {};
+
+  /* ---------- helpers ---------- */
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function isoDate(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+  function icon(name, size){
+    var s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', size); s.setAttribute('height', size);
+    s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2');
+    s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+    s.innerHTML = ICONS[name] || '';
+    return s;
+  }
+  function h(tag, attrs, kids){
+    var el = document.createElement(tag), k;
+    if(attrs) for(k in attrs){
+      if(attrs[k] === false || attrs[k] == null) continue;
+      if(k === 'class') el.className = attrs[k];
+      else if(k === 'text') el.textContent = attrs[k];
+      else el.setAttribute(k, attrs[k] === true ? '' : attrs[k]);
+    }
+    (kids || []).forEach(function(c){
+      if(c == null || c === false) return;
+      el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return el;
+  }
+  function hlStyle(key){
+    var x = HLS[key];
+    return x && x.line ? 'linear-gradient(transparent 55%, ' + x.line + ' 55%)' : '';
+  }
+  // Due labels work on the local calendar date, so a task due today still reads "今日" after midnight.
+  function dueInfo(ds, today){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return { text:'締切なし', urgent:false };
+    if(ds === today) return { text:'今日締切', urgent:true };
+    if(ds < today) return { text:'期限超過', urgent:true };
+    var p = ds.split('-'), t = today.split('-');
+    var diff = Math.round((new Date(+p[0], +p[1]-1, +p[2]) - new Date(+t[0], +t[1]-1, +t[2])) / 86400000);
+    if(diff === 1) return { text:'明日', urgent:false };
+    if(diff <= 3) return { text:'あと' + diff + '日', urgent:false };
+    return { text:(+p[1]) + '/' + (+p[2]), urgent:false };
+  }
+  function norm(d, id){
+    d = d || {};
+    return {
+      id:id, title:String(d.title || ''), due:String(d.due || '').slice(0, 10),
+      type:TYPES[d.type] ? d.type : 'pc', highlighter:HLS[d.highlighter] ? d.highlighter : 'none',
+      done:!!d.done, doneAt:d.doneAt || null, createdAt:d.createdAt || '', example:!!d.example
+    };
+  }
+  var toastTimer = null;
+  function toast(msg){
+    var t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.hidden = true; }, 3500);
+  }
+
+  /* ---------- storage ---------- */
+  function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(tasks)); }catch(e){} }
+  function onWriteError(e){
+    var code = e && e.code;
+    if(code === 'invalid_argument' || code === 'revoked' || code === 'not_granted'){
+      readOnly = true; render();
+      toast('この画面では課題を変更できません。');
+    } else if(code === 'quota_exceeded'){
+      toast('保存できる数の上限です。完了済みの課題を削除してからもう一度書き込んでください。');
+    } else {
+      toast('保存できませんでした。少し待ってからもう一度試してください。');
+    }
+  }
+  // One write at a time per document; retry once on a transient failure.
+  function enqueue(id, fn){
+    var run = function(){
+      return fn().catch(function(e){
+        if(e && e.code === 'unavailable'){
+          return new Promise(function(r){ setTimeout(r, 600 + Math.random() * 600); }).then(fn);
+        }
+        throw e;
+      });
+    };
+    queues[id] = (queues[id] || Promise.resolve()).then(run).catch(onWriteError);
+    return queues[id];
+  }
+  function put(id, data){
+    if(mode === 'db') return enqueue(id, function(){ return col.doc(id).set(data); });
+    tasks.push(norm(data, id)); saveLocal(); render();
+  }
+  function patch(id, part){
+    if(mode === 'db') return enqueue(id, function(){ return col.doc(id).update(part); });
+    var t = tasks.find(function(x){ return x.id === id; });
+    if(t){ Object.assign(t, part); saveLocal(); render(); }
+  }
+  function remove(id){
+    if(mode === 'db') return enqueue(id, function(){ return col.doc(id).delete(); });
+    tasks = tasks.filter(function(t){ return t.id !== id; });
+    saveLocal(); render();
+  }
+  function newId(){ return 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  /* ---------- render ---------- */
+  function rowEl(t, today){
+    var info = dueInfo(t.due, today), type = TYPES[t.type];
+    var ttl = h('span', { class:'ttl', text:t.title || '（無題）' });
+    if(!t.done && t.highlighter !== 'none') ttl.style.backgroundImage = hlStyle(t.highlighter);
+    var tool = h('span', { class:'tool', title:type.label }, [ icon(t.type, 16) ]);
+    if(!t.done) tool.style.color = type.color;
+    var main = h('button', { type:'button', class:'row-main', 'data-act':'toggle', 'data-id':t.id, disabled:readOnly,
+      title:t.done ? '未完了に戻す' : '完了にする' },
+      [ tool, h('span', { class:'ttl-wrap' }, [ ttl, t.example ? h('span', { class:'badge', text:'例' }) : null ]) ]);
+    var erase = h('button', { type:'button', class:'erase', 'data-act':'toggle', 'data-id':t.id, disabled:readOnly,
+      title:t.done ? '未完了に戻す' : '消しゴムで消す（完了）',
+      'aria-label':'「' + t.title + '」を' + (t.done ? '未完了に戻す' : '完了にする') },
+      [ icon('eraser', 14), h('span', { class:'lbl', text:t.done ? '戻す' : '消す' }) ]);
+    var trash = confirmId === t.id
+      ? h('button', { type:'button', class:'trash confirm', 'data-act':'delete', 'data-id':t.id, text:'削除する' })
+      : h('button', { type:'button', class:'trash', 'data-act':'ask-delete', 'data-id':t.id, disabled:readOnly,
+          title:'ノートから完全に削除', 'aria-label':'「' + t.title + '」を削除' }, [ icon('trash', 16) ]);
+    return h('li', { class:'row' + (t.done ? ' is-done' : '') }, [
+      main,
+      h('div', { class:'row-side' }, [
+        h('span', { class:'due' + (!t.done && info.urgent ? ' urgent' : ''), text:info.text }), erase, trash ])
+    ]);
+  }
+
+  function render(){
+    var now = new Date(), today = isoDate(now);
+    $('today-label').textContent = now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 (' + WD[now.getDay()] + ')';
+
+    var open = tasks.filter(function(t){ return !t.done; });
+    var nToday = open.filter(function(t){ return t.due && t.due <= today; }).length;
+    $('n-today').textContent = loaded ? String(nToday) : '–';
+    $('n-today').className = nToday > 0 ? 'hot' : '';
+    $('n-left').textContent = loaded ? String(open.length) : '–';
+    $('c-un').textContent = String(open.length);
+    $('c-all').textContent = String(tasks.length);
+    $('c-done').textContent = String(tasks.length - open.length);
+
+    Array.prototype.forEach.call($('tabs').children, function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-tab') === activeTab));
+    });
+    Array.prototype.forEach.call($('types').children, function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-type') === typeFilter));
+    });
+
+    var list = tasks.filter(function(t){
+      if(activeTab === 'uncompleted') return !t.done;
+      if(activeTab === 'completed') return t.done;
+      return true;
+    }).filter(function(t){
+      return typeFilter === 'all' || t.type === typeFilter;
+    }).sort(function(a, b){
+      if(a.done !== b.done) return a.done ? 1 : -1;
+      return (a.due || '9999').localeCompare(b.due || '9999') || String(a.createdAt).localeCompare(String(b.createdAt));
+    });
+
+    var wrap = $('list-wrap'); wrap.textContent = '';
+    if(!loaded){
+      wrap.appendChild(h('div', { class:'empty' }, [ h('p', { text:'課題を読み込み中…' }) ]));
+    } else if(!list.length){
+      wrap.appendChild(h('div', { class:'empty' }, [
+        h('p', { text:'該当する課題はありません。' }),
+        readOnly ? null : h('p', { text:'右下のペンボタンから新しい課題をノートに書き込めます。' }) ]));
+    } else {
+      var ul = h('ul');
+      list.forEach(function(t){ ul.appendChild(rowEl(t, today)); });
+      for(var i = list.length; i < 6; i++) ul.appendChild(h('li', { class:'blank', 'aria-hidden':'true' }));
+      wrap.appendChild(ul);
+    }
+
+    var note = $('note'), msg = '';
+    if(mode === 'local') msg = 'この画面では、課題はこの端末のブラウザにだけ保存されます。';
+    else if(failed) msg = '課題を読み込めませんでした。ページを開き直してください。';
+    else if(slow) msg = loaded ? '最新の状態を確認できていません。表示が古い可能性があります。' : 'まだデータにつながりません。そのままお待ちください。';
+    else if(readOnly) msg = 'この画面は閲覧専用です。';
+    note.textContent = msg; note.hidden = !msg;
+    $('fab').hidden = readOnly || !loaded;
+    $('example-bar').hidden = readOnly || !tasks.some(function(t){ return t.example; });
+  }
+
+  /* ---------- list + filters ---------- */
+  $('list-wrap').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-act]'); if(!b || readOnly) return;
+    var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+    var t = tasks.find(function(x){ return x.id === id; }); if(!t) return;
+    if(act === 'toggle'){
+      confirmId = null;
+      patch(id, t.done ? { done:false, doneAt:null } : { done:true, doneAt:new Date().toISOString() });
+    } else if(act === 'ask-delete'){ confirmId = id; render(); }
+    else if(act === 'delete'){ confirmId = null; remove(id); }
+  });
+  document.addEventListener('click', function(ev){
+    if(confirmId && !ev.target.closest('.trash')){ confirmId = null; render(); }
+  });
+  $('tabs').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-tab]'); if(!b) return;
+    activeTab = b.getAttribute('data-tab'); render();
+  });
+  $('types').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-type]'); if(!b) return;
+    typeFilter = b.getAttribute('data-type'); render();
+  });
+  $('clear-examples').addEventListener('click', function(){
+    tasks.filter(function(t){ return t.example; }).map(function(t){ return t.id; }).forEach(remove);
+  });
+
+  /* ---------- modal ---------- */
+  function syncPicks(){
+    Array.prototype.forEach.call($('m-types').children, function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-type') === newType));
+    });
+    Array.prototype.forEach.call($('m-hls').children, function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-hl') === newHl));
+    });
+    var pv = $('m-preview');
+    pv.textContent = $('m-title').value.trim() || '課題のタイトル';
+    pv.style.backgroundImage = hlStyle(newHl);
+  }
+  function openModal(){
+    $('m-title').value = ''; $('m-msg').textContent = ''; newHl = 'none';
+    if(!$('m-date').value) $('m-date').value = isoDate(new Date());
+    syncPicks();
+    $('modal').hidden = false;
+    $('m-title').focus();
+  }
+  function closeModal(){
+    if($('modal').hidden) return;
+    $('modal').hidden = true; $('fab').focus();
+  }
+  Object.keys(TYPES).forEach(function(k){
+    $('m-types').appendChild(h('button', { type:'button', class:'pick', 'data-type':k, 'aria-pressed':'false' },
+      [ icon(k, 20), h('span', { text:TYPES[k].label }) ]));
+  });
+  Object.keys(HLS).forEach(function(k){
+    var b = h('button', { type:'button', class:'hl', 'data-hl':k, 'aria-pressed':'false', title:HLS[k].label, 'aria-label':HLS[k].label }, [ icon('check', 16) ]);
+    b.style.background = HLS[k].dot;
+    $('m-hls').appendChild(b);
+  });
+  $('m-types').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-type]'); if(!b) return;
+    newType = b.getAttribute('data-type'); syncPicks();
+  });
+  $('m-hls').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-hl]'); if(!b) return;
+    newHl = b.getAttribute('data-hl'); syncPicks();
+  });
+  $('m-title').addEventListener('input', syncPicks);
+  $('fab').addEventListener('click', openModal);
+  $('m-close').addEventListener('click', closeModal);
+  $('m-cancel').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', function(ev){ if(ev.target === $('modal')) closeModal(); });
+  document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape') closeModal(); });
+  $('task-form').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var title = $('m-title').value.trim(), date = $('m-date').value;
+    if(!title){ $('m-msg').textContent = '課題の内容を入れてください。'; $('m-title').focus(); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ $('m-msg').textContent = '締切日を選んでください。'; $('m-date').focus(); return; }
+    put(newId(), { title:title, due:date, type:newType, highlighter:newHl, done:false, doneAt:null,
+      createdAt:new Date().toISOString(), example:false });
+    if(activeTab === 'completed') activeTab = 'uncompleted';
+    if(typeFilter !== 'all' && typeFilter !== newType) typeFilter = 'all';
+    closeModal(); render();
+    toast('ノートに書き込みました');
+  });
+
+  /* ---------- start ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-icon]'), function(el){
+    el.appendChild(icon(el.getAttribute('data-icon'), +el.getAttribute('data-size') || 16));
+    el.style.display = 'inline-flex';
+  });
+  function startLocal(){
+    mode = 'local';
+    try{
+      var raw = localStorage.getItem(LS_KEY), a = raw ? JSON.parse(raw) : null;
+      if(Array.isArray(a)) tasks = a.map(function(t){ return norm(t, String(t && t.id || newId())); });
+    }catch(e){}
+    loaded = true; render();
+  }
+  async function init(){
+    render();
+    var db = null, user = null;
+    try{
+      if(window.claude && typeof window.claude.use === 'function'){
+        var r = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+        db = r[0]; user = r[1];
+      }
+    }catch(e){}
+    if(!db){ startLocal(); return; }
+    mode = 'db'; col = db.collection('tasks');
+    var timer = setTimeout(function(){ slow = true; render(); }, 10000);
+    col.onSnapshot(function(snap){
+      tasks = snap.docs.map(function(d){ return norm(d.data(), d.id); });
+      loaded = true;
+      if(!snap.metadata.fromCache){ clearTimeout(timer); slow = false; }
+      render();
+    }, function(){
+      clearTimeout(timer); slow = false; failed = true; loaded = true; render();
+    });
+    if(user){
+      try{ if((await user.can('data.write')) === false){ readOnly = true; render(); } }catch(e){}
+    }
+  }
+  setInterval(render, 60000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) render(); });
+  init();
+})();
+</script>
+</body>
+</html>
